@@ -1,0 +1,10 @@
+[package]
+name = "time-tracker"
+version = "0.1.0"
+authors = ["Daniel Bruce <dbruce1126@gmail.com>"]
+
+[dependencies]
+xcb = "0.8"
+
+[dependencies.i3ipc]
+version = "0.8.2"
