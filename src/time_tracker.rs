@@ -32,7 +32,10 @@ impl TimeTracker {
                             n,
                             get_class(&self.xorg_conn, &e.container.window.unwrap())
                         ),
-                        None => println!("Untitled ({})", get_class(&self.xorg_conn, &e.container.window.unwrap())),
+                        None => println!(
+                            "Untitled ({})",
+                            get_class(&self.xorg_conn, &e.container.window.unwrap())
+                        ),
                     },
                     _ => {}
                 },
