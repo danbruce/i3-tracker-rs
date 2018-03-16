@@ -1,7 +1,12 @@
+use csv::Writer;
 use i3ipc::I3EventListener;
 use i3ipc::Subscription;
 use i3ipc::event::Event;
 use i3ipc::event::inner::WindowChange;
+use std::error::Error;
+use std::fs::File;
+use std::time::Duration;
+use std::time::SystemTime;
 use xcb;
 
 /**
@@ -46,30 +51,59 @@ fn get_class(conn: &xcb::Connection, id: &i32) -> String {
     results[0].to_string()
 }
 
-pub fn track_time() {
-    let mut i3_listener = I3EventListener::connect().unwrap();
-    let (xorg_conn, _screen_num) = xcb::Connection::connect(None).unwrap();
+fn write_to_file(
+    writer: &mut Writer<File>,
+    e: &LogEvent,
+    length: Duration,
+) -> Result<(), Box<Error>> {
+    writer.write_record(&[
+        e.title.clone(),
+        e.window_class.clone(),
+        length.as_secs().to_string(),
+    ])?;
+    writer.flush()?;
+    Ok(())
+}
+
+pub fn track_time() -> Result<(), Box<Error>> {
+    let mut i3_listener = I3EventListener::connect()?;
+    let (xorg_conn, _screen_num) = xcb::Connection::connect(None)?;
+    let mut writer = Writer::from_path("output.log")?;
 
     let subs = [Subscription::Window];
-    i3_listener.subscribe(&subs).unwrap();
-    // handle them
+    i3_listener.subscribe(&subs)?;
+    let mut current_event: Option<LogEvent> = None;
     for event in i3_listener.listen() {
-        match event.unwrap() {
-            Event::WindowEvent(e) => match e.change {
-                WindowChange::Focus => match e.container.name {
-                    Some(n) => println!(
-                        "{} ({})",
-                        n,
-                        get_class(&xorg_conn, &e.container.window.unwrap())
-                    ),
-                    None => println!(
-                        "Untitled ({})",
-                        get_class(&xorg_conn, &e.container.window.unwrap())
-                    ),
-                },
-                _ => {}
-            },
+        match event? {
+            Event::WindowEvent(e) => {
+                match &current_event {
+                    &Some(ref e) => {
+                        let elapsed = e.time.elapsed()?;
+                        write_to_file(&mut writer, &e, elapsed)?;
+                    }
+                    _ => {}
+                };
+                match e.change {
+                    WindowChange::Focus => {
+                        if let &Some(ref window) = &e.container.window {
+                            current_event = Some(LogEvent {
+                                time: SystemTime::now(),
+                                title: e.container.name.unwrap_or("Untitled".to_string()),
+                                window_class: get_class(&xorg_conn, &window),
+                            });
+                        }
+                    }
+                    _ => {}
+                };
+            }
             _ => {}
         }
     }
+    Ok(())
+}
+
+struct LogEvent {
+    time: SystemTime,
+    title: String,
+    window_class: String,
 }
