@@ -128,8 +128,6 @@ impl LogEvent {
     fn get_output_row(&self) -> Result<OutputRow, Box<Error>> {
         let now = Local::now();
         let elapsed = now.signed_duration_since(self.start_date_time);
-        // let timestamp = self.time.duration_since(UNIX_EPOCH)?;
-        // let start_date = NaiveDateTime::from_timestamp(timestamp.as_secs() as i64, 0);
         Ok([
             self.id.to_string(),
             self.window_id.to_string(),
