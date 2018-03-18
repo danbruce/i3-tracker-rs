@@ -1,3 +1,4 @@
+use chrono::prelude::*;
 use csv::Writer;
 use i3ipc::I3EventListener;
 use i3ipc::Subscription;
@@ -5,8 +6,6 @@ use i3ipc::event::Event;
 use i3ipc::event::inner::WindowChange;
 use std::error::Error;
 use std::fs::File;
-use std::time::Duration;
-use std::time::SystemTime;
 use xcb;
 
 /**
@@ -51,16 +50,23 @@ fn get_class(conn: &xcb::Connection, id: &i32) -> String {
     results[0].to_string()
 }
 
-fn write_to_file(
-    writer: &mut Writer<File>,
-    e: &LogEvent,
-    length: Duration,
-) -> Result<(), Box<Error>> {
-    writer.write_record(&[
-        e.title.clone(),
-        e.window_class.clone(),
-        length.as_secs().to_string(),
-    ])?;
+fn write_event_to_file(writer: &mut Writer<File>, e: &LogEvent) -> Result<(), Box<Error>> {
+    let row = e.get_output_row()?;
+    writer.write_record(&row)?;
+    writer.flush()?;
+    Ok(())
+}
+fn write_header_to_file(writer: &mut Writer<File>) -> Result<(), Box<Error>> {
+    let header: OutputRow = [
+        "id".to_string(),
+        "window_id".to_string(),
+        "window_title".to_string(),
+        "window_class".to_string(),
+        "start_time".to_string(),
+        "end_time".to_string(),
+        "duration".to_string(),
+    ];
+    writer.write_record(&header)?;
     writer.flush()?;
     Ok(())
 }
@@ -78,18 +84,24 @@ pub fn track_time() -> Result<(), Box<Error>> {
             Event::WindowEvent(e) => {
                 match &current_event {
                     &Some(ref e) => {
-                        let elapsed = e.time.elapsed()?;
-                        write_to_file(&mut writer, &e, elapsed)?;
+                        write_event_to_file(&mut writer, &e)?;
                     }
-                    _ => {}
+                    &None => {
+                        write_header_to_file(&mut writer)?;
+                    }
                 };
                 match e.change {
-                    WindowChange::Focus => {
+                    WindowChange::Focus | WindowChange::Title => {
                         if let &Some(ref window) = &e.container.window {
                             current_event = Some(LogEvent {
-                                time: SystemTime::now(),
-                                title: e.container.name.unwrap_or("Untitled".to_string()),
+                                id: match current_event {
+                                    Some(e) => e.id + 1,
+                                    None => 1,
+                                },
+                                start_date_time: Local::now(),
+                                window_id: *window as usize,
                                 window_class: get_class(&xorg_conn, &window),
+                                window_title: e.container.name.unwrap_or("Untitled".to_string()),
                             });
                         }
                     }
@@ -102,8 +114,30 @@ pub fn track_time() -> Result<(), Box<Error>> {
     Ok(())
 }
 
+type OutputRow = [String; 7];
+
 struct LogEvent {
-    time: SystemTime,
-    title: String,
+    id: u32,
+    start_date_time: DateTime<Local>,
+    window_id: usize,
     window_class: String,
+    window_title: String,
+}
+
+impl LogEvent {
+    fn get_output_row(&self) -> Result<OutputRow, Box<Error>> {
+        let now = Local::now();
+        let elapsed = now.signed_duration_since(self.start_date_time);
+        // let timestamp = self.time.duration_since(UNIX_EPOCH)?;
+        // let start_date = NaiveDateTime::from_timestamp(timestamp.as_secs() as i64, 0);
+        Ok([
+            self.id.to_string(),
+            self.window_id.to_string(),
+            self.window_title.clone(),
+            self.window_class.clone(),
+            self.start_date_time.format("%F %T").to_string(),
+            now.format("%F %T").to_string(),
+            elapsed.num_seconds().to_string(),
+        ])
+    }
 }

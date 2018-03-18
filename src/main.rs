@@ -1,3 +1,4 @@
+extern crate chrono;
 extern crate csv;
 extern crate i3ipc;
 extern crate xcb;
