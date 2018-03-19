@@ -6,7 +6,7 @@ extern crate xcb;
 mod time_tracker;
 
 fn main() {
-    match time_tracker::track_time() {
+    match time_tracker::track_time("output.log") {
         Err(e) => panic!("{:?}", e),
         _ => {}
     };

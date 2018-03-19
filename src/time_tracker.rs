@@ -1,11 +1,11 @@
 use chrono::prelude::*;
-use csv::Writer;
+use csv::{Reader, Writer};
 use i3ipc::I3EventListener;
 use i3ipc::Subscription;
 use i3ipc::event::Event;
 use i3ipc::event::inner::WindowChange;
 use std::error::Error;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use xcb;
 
 /**
@@ -71,10 +71,49 @@ fn write_header_to_file(writer: &mut Writer<File>) -> Result<(), Box<Error>> {
     Ok(())
 }
 
-pub fn track_time() -> Result<(), Box<Error>> {
+pub fn track_time(output_filename: &str) -> Result<(), Box<Error>> {
     let mut i3_listener = I3EventListener::connect()?;
     let (xorg_conn, _screen_num) = xcb::Connection::connect(None)?;
-    let mut writer = Writer::from_path("output.log")?;
+    let mut first_event_id = 1;
+    let mut writer = match OpenOptions::new().append(true).open(output_filename) {
+        Ok(f) => {
+            let mut r =
+                Reader::from_reader(OpenOptions::new().read(true).open(output_filename).unwrap());
+            match r.into_records().last() {
+                Some(last_line) => {
+                    match last_line {
+                        Ok(r) => {
+                            if r.len() > 0 {
+                                match r[0].parse::<u32>() {
+                                    Ok(i) => {
+                                        first_event_id = i + 1;
+                                    }
+                                    Err(_) => {}
+                                }
+                            }
+                        }
+                        Err(_) => {}
+                    };
+                }
+                None => {}
+            };
+            Writer::from_writer(f)
+        }
+        Err(_) => match OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(output_filename)
+        {
+            Ok(f) => {
+                let mut w = Writer::from_writer(f);
+                write_header_to_file(&mut w).unwrap();
+                w
+            }
+            Err(e) => {
+                panic!("Unable to open log file: {}", e);
+            }
+        },
+    };
 
     let subs = [Subscription::Window];
     i3_listener.subscribe(&subs)?;
@@ -86,9 +125,7 @@ pub fn track_time() -> Result<(), Box<Error>> {
                     &Some(ref e) => {
                         write_event_to_file(&mut writer, &e)?;
                     }
-                    &None => {
-                        write_header_to_file(&mut writer)?;
-                    }
+                    &None => {}
                 };
                 match e.change {
                     WindowChange::Focus | WindowChange::Title => {
@@ -96,7 +133,7 @@ pub fn track_time() -> Result<(), Box<Error>> {
                             current_event = Some(LogEvent {
                                 id: match current_event {
                                     Some(e) => e.id + 1,
-                                    None => 1,
+                                    None => first_event_id,
                                 },
                                 start_date_time: Local::now(),
                                 window_id: *window as usize,
