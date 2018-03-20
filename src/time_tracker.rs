@@ -1,5 +1,5 @@
 use chrono::prelude::*;
-use csv::{Reader, Writer};
+use csv::{Reader, Writer, WriterBuilder};
 use i3ipc::I3EventListener;
 use i3ipc::Subscription;
 use i3ipc::event::Event;
@@ -96,8 +96,14 @@ fn next_event_id<P: AsRef<Path>>(output_filename: P) -> Result<u32, Box<Error>> 
 }
 
 fn csv_writer<P: AsRef<Path>>(path: P) -> Result<Writer<File>, Box<Error>> {
-    let file = OpenOptions::new().create(true).append(true).open(path)?;
-    Ok(Writer::from_writer(file))
+    let file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path.as_ref())?;
+    let wtr = WriterBuilder::new()
+        .has_headers(!Path::new(path.as_ref()).exists())
+        .from_writer(file);
+    Ok(wtr)
 }
 
 pub fn track_time<P: AsRef<Path>>(out_path: P) -> Result<(), Box<Error>> {
