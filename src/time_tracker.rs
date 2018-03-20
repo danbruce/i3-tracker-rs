@@ -40,8 +40,7 @@ fn get_class(conn: &xcb::Connection, id: &i32) -> String {
                     }
                 }
             }
-            Err(err) => {
-                println!("{:?}", err);
+            Err(_) => {
                 break;
             }
         }
@@ -53,7 +52,6 @@ fn get_class(conn: &xcb::Connection, id: &i32) -> String {
 
 fn write_event_to_file(writer: &mut Writer<File>, e: &LogEvent) -> Result<(), Box<Error>> {
     let row = e.get_output_row()?;
-    println!("{:?}", row);
     writer.write_record(&row)?;
     writer.flush()?;
     Ok(())
@@ -68,7 +66,6 @@ fn write_header_to_file(writer: &mut Writer<File>) -> Result<(), Box<Error>> {
         "end_time".to_string(),
         "duration".to_string(),
     ];
-    println!("{:?}", header);
     writer.write_record(&header)?;
     writer.flush()?;
     Ok(())
@@ -160,22 +157,14 @@ pub fn track_time(output_filename: &str) -> Result<(), Box<Error>> {
                         if let Some(e) = current_event {
                             write_event_to_file(&mut writer, &e)?;
                         }
-                        current_event = Some(next_event(
-                            &mut next_event_id,
-                            &e,
-                            &xorg_conn,
-                        ));
+                        current_event = Some(next_event(&mut next_event_id, &e, &xorg_conn));
                     }
                     WindowChange::Title => {
                         last_event_new = false;
                         if let Some(e) = current_event {
                             write_event_to_file(&mut writer, &e)?;
                         }
-                        current_event = Some(next_event(
-                            &mut next_event_id,
-                            &e,
-                            &xorg_conn,
-                        ));
+                        current_event = Some(next_event(&mut next_event_id, &e, &xorg_conn));
                     }
                     _ => {}
                 };
