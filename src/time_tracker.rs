@@ -94,49 +94,40 @@ fn next_event(
     }
 }
 
+fn get_next_event_id(output_filename: &str) -> u32 {
+    if let Ok(f) = OpenOptions::new().read(true).open(output_filename) {
+        let mut r = Reader::from_reader(f);
+        if let Some(Ok(last_line)) = r.into_records().last() {
+            if last_line.len() > 0 {
+                if let Ok(i) = last_line[0].parse::<u32>() {
+                    return i;
+                }
+            }
+        }
+    }
+    1
+}
+
+fn get_csv_writer(output_filename: &str, has_lines: bool) -> Result<Writer<File>, Box<Error>> {
+    if let Ok(append) = OpenOptions::new().append(true).open(output_filename) {
+        if has_lines {
+            return Ok(Writer::from_writer(append));
+        }
+    }
+    let file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open(output_filename)?;
+    let mut writer = Writer::from_writer(file);
+    write_header_to_file(&mut writer)?;
+    Ok(writer)
+}
+
 pub fn track_time(output_filename: &str) -> Result<(), Box<Error>> {
     let mut i3_listener = I3EventListener::connect()?;
     let (xorg_conn, _screen_num) = xcb::Connection::connect(None)?;
-    let mut next_event_id = 1;
-    let mut writer = match OpenOptions::new().append(true).open(output_filename) {
-        Ok(f) => {
-            let mut r =
-                Reader::from_reader(OpenOptions::new().read(true).open(output_filename).unwrap());
-            match r.into_records().last() {
-                Some(last_line) => {
-                    match last_line {
-                        Ok(r) => {
-                            if r.len() > 0 {
-                                match r[0].parse::<u32>() {
-                                    Ok(i) => {
-                                        next_event_id = i + 1;
-                                    }
-                                    Err(_) => {}
-                                }
-                            }
-                        }
-                        Err(_) => {}
-                    };
-                }
-                None => {}
-            };
-            Writer::from_writer(f)
-        }
-        Err(_) => match OpenOptions::new()
-            .create(true)
-            .write(true)
-            .open(output_filename)
-        {
-            Ok(f) => {
-                let mut w = Writer::from_writer(f);
-                write_header_to_file(&mut w).unwrap();
-                w
-            }
-            Err(e) => {
-                panic!("Unable to open log file: {}", e);
-            }
-        },
-    };
+    let mut next_event_id = get_next_event_id(output_filename);
+    let mut writer = get_csv_writer(output_filename, next_event_id > 1)?;
 
     let subs = [Subscription::Window];
     i3_listener.subscribe(&subs)?;
