@@ -4,6 +4,7 @@ use i3ipc::I3EventListener;
 use i3ipc::Subscription;
 use i3ipc::event::Event;
 use i3ipc::event::inner::WindowChange;
+use i3ipc::event::WindowEventInfo;
 use std::error::Error;
 use std::fs::{File, OpenOptions};
 use xcb;
@@ -52,6 +53,7 @@ fn get_class(conn: &xcb::Connection, id: &i32) -> String {
 
 fn write_event_to_file(writer: &mut Writer<File>, e: &LogEvent) -> Result<(), Box<Error>> {
     let row = e.get_output_row()?;
+    println!("{:?}", row);
     writer.write_record(&row)?;
     writer.flush()?;
     Ok(())
@@ -66,15 +68,39 @@ fn write_header_to_file(writer: &mut Writer<File>) -> Result<(), Box<Error>> {
         "end_time".to_string(),
         "duration".to_string(),
     ];
+    println!("{:?}", header);
     writer.write_record(&header)?;
     writer.flush()?;
     Ok(())
 }
 
+fn next_event(
+    next_event_id: &mut u32,
+    event: &WindowEventInfo,
+    xorg_conn: &xcb::Connection,
+) -> LogEvent {
+    let window_id: i32 = match event.container.window {
+        Some(w) => w,
+        None => -1,
+    };
+    let window_title: String = match &event.container.name {
+        &Some(ref s) => s.clone(),
+        &None => "Untitled".to_string(),
+    };
+    *next_event_id += 1;
+    LogEvent {
+        id: *next_event_id - 1,
+        start_date_time: Local::now(),
+        window_id: window_id,
+        window_class: get_class(&xorg_conn, &window_id),
+        window_title: window_title,
+    }
+}
+
 pub fn track_time(output_filename: &str) -> Result<(), Box<Error>> {
     let mut i3_listener = I3EventListener::connect()?;
     let (xorg_conn, _screen_num) = xcb::Connection::connect(None)?;
-    let mut first_event_id = 1;
+    let mut next_event_id = 1;
     let mut writer = match OpenOptions::new().append(true).open(output_filename) {
         Ok(f) => {
             let mut r =
@@ -86,7 +112,7 @@ pub fn track_time(output_filename: &str) -> Result<(), Box<Error>> {
                             if r.len() > 0 {
                                 match r[0].parse::<u32>() {
                                     Ok(i) => {
-                                        first_event_id = i + 1;
+                                        next_event_id = i + 1;
                                     }
                                     Err(_) => {}
                                 }
@@ -118,29 +144,38 @@ pub fn track_time(output_filename: &str) -> Result<(), Box<Error>> {
     let subs = [Subscription::Window];
     i3_listener.subscribe(&subs)?;
     let mut current_event: Option<LogEvent> = None;
+    let mut last_event_new: bool = false;
     for event in i3_listener.listen() {
         match event? {
             Event::WindowEvent(e) => {
-                match &current_event {
-                    &Some(ref e) => {
-                        write_event_to_file(&mut writer, &e)?;
-                    }
-                    &None => {}
-                };
                 match e.change {
-                    WindowChange::Focus | WindowChange::Title => {
-                        if let &Some(ref window) = &e.container.window {
-                            current_event = Some(LogEvent {
-                                id: match current_event {
-                                    Some(e) => e.id + 1,
-                                    None => first_event_id,
-                                },
-                                start_date_time: Local::now(),
-                                window_id: *window as usize,
-                                window_class: get_class(&xorg_conn, &window),
-                                window_title: e.container.name.unwrap_or("Untitled".to_string()),
-                            });
+                    WindowChange::New => {
+                        last_event_new = true;
+                    }
+                    WindowChange::Focus => {
+                        if last_event_new {
+                            last_event_new = false;
+                            continue;
                         }
+                        if let Some(e) = current_event {
+                            write_event_to_file(&mut writer, &e)?;
+                        }
+                        current_event = Some(next_event(
+                            &mut next_event_id,
+                            &e,
+                            &xorg_conn,
+                        ));
+                    }
+                    WindowChange::Title => {
+                        last_event_new = false;
+                        if let Some(e) = current_event {
+                            write_event_to_file(&mut writer, &e)?;
+                        }
+                        current_event = Some(next_event(
+                            &mut next_event_id,
+                            &e,
+                            &xorg_conn,
+                        ));
                     }
                     _ => {}
                 };
@@ -156,7 +191,7 @@ type OutputRow = [String; 7];
 struct LogEvent {
     id: u32,
     start_date_time: DateTime<Local>,
-    window_id: usize,
+    window_id: i32,
     window_class: String,
     window_title: String,
 }
