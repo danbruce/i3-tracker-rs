@@ -7,10 +7,10 @@ extern crate serde;
 extern crate xcb;
 
 mod time_tracker;
+mod error;
 
 fn main() {
-    match time_tracker::track_time("output.log") {
-        Err(e) => panic!("{:?}", e),
-        _ => {}
+    if let Err(e) = time_tracker::run("output.log") {
+        panic!("{:?}", e);
     };
 }
