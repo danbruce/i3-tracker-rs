@@ -8,17 +8,8 @@ use std::error::Error;
 use std::sync::mpsc::Sender;
 use xcb;
 
-// we only actually care about these particular window event types
-#[derive(Clone)]
-pub enum WindowEventType {
-    New,
-    Focus,
-    Title,
-}
-
 #[derive(Clone)]
 pub struct I3LogEvent {
-    pub event_type: WindowEventType,
     pub start_time: DateTime<Local>,
     pub window_id: u32,
     pub window_class: String,
@@ -27,18 +18,11 @@ pub struct I3LogEvent {
 
 impl I3LogEvent {
     fn new(
-        event_type: WindowChange,
         window_id: u32,
         window_class: String,
         window_title: String,
     ) -> Self {
         I3LogEvent {
-            event_type: match event_type {
-                WindowChange::New => WindowEventType::New,
-                WindowChange::Focus => WindowEventType::Focus,
-                WindowChange::Title => WindowEventType::Title,
-                _ => unreachable!(),
-            },
             start_time: Local::now(),
             window_id,
             window_class,
@@ -126,7 +110,6 @@ pub fn run(sender: Sender<super::time_tracker::LogEvent>) -> Result<(), Box<Erro
                         .clone()
                         .unwrap_or_else(|| "Untitled".into());
                     let send_event = I3Event(I3LogEvent::new(
-                        e.change,
                         window_id as u32,
                         window_class,
                         window_title,
