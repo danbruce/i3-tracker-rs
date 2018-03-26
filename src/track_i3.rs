@@ -92,9 +92,10 @@ pub fn run(sender: Sender<super::time_tracker::LogEvent>) -> Result<(), Box<Erro
                     prev_new_window_id = Some(window_id);
                     continue;
                 }
-                WindowChange::Title => {
+                WindowChange::Focus => {
                     if let Some(prev_window_id) = prev_new_window_id {
                         if prev_window_id == window_id {
+                            prev_new_window_id = None;
                             continue;
                         }
                     }
