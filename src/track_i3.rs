@@ -17,11 +17,7 @@ pub struct I3LogEvent {
 }
 
 impl I3LogEvent {
-    fn new(
-        window_id: u32,
-        window_class: String,
-        window_title: String,
-    ) -> Self {
+    fn new(window_id: u32, window_class: String, window_title: String) -> Self {
         I3LogEvent {
             start_time: Local::now(),
             window_id,
