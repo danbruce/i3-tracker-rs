@@ -7,7 +7,6 @@ extern crate serde;
 extern crate xcb;
 
 mod time_tracker;
-mod error;
 
 fn main() {
     if let Err(e) = time_tracker::run("output.log") {
