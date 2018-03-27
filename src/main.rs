@@ -1,6 +1,7 @@
 extern crate chrono;
 extern crate csv;
 extern crate i3ipc;
+extern crate fs2;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;

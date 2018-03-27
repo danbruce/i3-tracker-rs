@@ -1,6 +1,7 @@
 use super::track_i3;
 use chrono::prelude::*;
 use csv::{Reader, Writer, WriterBuilder};
+use fs2::FileExt;
 use std::error::Error;
 use std::fs::{File, OpenOptions};
 use std::path::Path;
@@ -61,6 +62,7 @@ fn csv_writer<P: AsRef<Path>>(path: P) -> Result<Writer<File>, Box<Error>> {
         .create(true)
         .append(true)
         .open(path.as_ref())?;
+    file.try_lock_exclusive()?;
     let wtr = WriterBuilder::new()
         .has_headers(has_headers)
         .from_writer(file);
@@ -79,8 +81,8 @@ pub fn run<P: AsRef<Path>>(out_path: P) -> Result<(), Box<Error>> {
         track_i3::run(tx.clone()).unwrap();
     });
 
-    let mut writer = csv_writer(&out_path)?;
     let mut next_event_id = initial_event_id(&out_path)?;
+    let mut writer = csv_writer(&out_path)?;
     let mut prev_i3_event: Option<track_i3::I3LogEvent> = None;
     loop {
         let event = rx.recv()?;
@@ -89,6 +91,7 @@ pub fn run<P: AsRef<Path>>(out_path: P) -> Result<(), Box<Error>> {
                 if let Some(prev) = prev_i3_event {
                     let log = Log::new(next_event_id, &LogEvent::I3Event(prev));
                     log.write(&mut writer)?;
+                    println!("Written.");
                     next_event_id += 1;
                 }
                 prev_i3_event = Some(e.clone());
