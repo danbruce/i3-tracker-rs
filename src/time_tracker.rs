@@ -108,10 +108,11 @@ pub fn run<P: AsRef<Path>>(out_path: P, tick_sleep: Duration) -> Result<(), Box<
                 if next_event_id != e.0 {
                     continue;
                 }
-                if let &Some(ref prev) = &prev_i3_event {
+                if let Some(prev) = prev_i3_event {
                     let log = Log::new(next_event_id, &LogEvent::I3Event(prev.clone()));
                     log.write(&mut writer)?;
                     next_event_id += 1;
+                    prev_i3_event = Some(track_i3::I3LogEvent::from_tick(&prev));
                 }
                 let tick_tx = tx.clone();
                 thread::spawn(move || {

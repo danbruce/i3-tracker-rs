@@ -25,6 +25,14 @@ impl I3LogEvent {
             window_title,
         }
     }
+    pub fn from_tick(old_event: &Self) -> Self {
+        I3LogEvent {
+            start_time: Local::now(),
+            window_id: old_event.window_id,
+            window_class: old_event.window_class.clone(),
+            window_title: old_event.window_title.clone(),
+        }
+    }
 }
 
 /*
