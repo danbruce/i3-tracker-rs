@@ -1,3 +1,4 @@
+use super::tick;
 use super::track_i3;
 use chrono::prelude::*;
 use csv::{Reader, Writer, WriterBuilder};
@@ -8,6 +9,7 @@ use std::path::Path;
 use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
+use std::time::Duration;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Log {
@@ -36,6 +38,7 @@ impl Log {
                     end_time: now.format("%F %T").to_string(),
                 }
             }
+            _ => { unreachable!() }
         }
     }
     fn write(&self, writer: &mut Writer<File>) -> Result<(), Box<Error>> {
@@ -72,13 +75,15 @@ fn csv_writer<P: AsRef<Path>>(path: P) -> Result<Writer<File>, Box<Error>> {
 // the possible events we receive off the channel
 pub enum LogEvent {
     I3Event(track_i3::I3LogEvent),
+    TickEvent(tick::TickEvent),
 }
 
-pub fn run<P: AsRef<Path>>(out_path: P) -> Result<(), Box<Error>> {
+pub fn run<P: AsRef<Path>>(out_path: P, tick_sleep: Duration) -> Result<(), Box<Error>> {
     let (tx, rx): (Sender<LogEvent>, Receiver<LogEvent>) = mpsc::channel();
+    let track_i3_tx = tx.clone();
     // start the i3 event listening thread
     thread::spawn(move || {
-        track_i3::run(tx.clone()).unwrap();
+        track_i3::run(track_i3_tx).unwrap();
     });
 
     let mut next_event_id = initial_event_id(&out_path)?;
@@ -93,7 +98,25 @@ pub fn run<P: AsRef<Path>>(out_path: P) -> Result<(), Box<Error>> {
                     log.write(&mut writer)?;
                     next_event_id += 1;
                 }
+                let tick_tx = tx.clone();
+                thread::spawn(move || {
+                    tick::run(tick_tx, next_event_id, tick_sleep).unwrap();
+                });
                 prev_i3_event = Some(e.clone());
+            }
+            &LogEvent::TickEvent(ref e) => {
+                if next_event_id != e.0 {
+                    continue;
+                }
+                if let &Some(ref prev) = &prev_i3_event {
+                    let log = Log::new(next_event_id, &LogEvent::I3Event(prev.clone()));
+                    log.write(&mut writer)?;
+                    next_event_id += 1;
+                }
+                let tick_tx = tx.clone();
+                thread::spawn(move || {
+                    tick::run(tick_tx, next_event_id, tick_sleep).unwrap();
+                });
             }
         }
     }
