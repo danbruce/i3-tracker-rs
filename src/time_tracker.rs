@@ -91,7 +91,6 @@ pub fn run<P: AsRef<Path>>(out_path: P) -> Result<(), Box<Error>> {
                 if let Some(prev) = prev_i3_event {
                     let log = Log::new(next_event_id, &LogEvent::I3Event(prev));
                     log.write(&mut writer)?;
-                    println!("Written.");
                     next_event_id += 1;
                 }
                 prev_i3_event = Some(e.clone());
