@@ -3,7 +3,7 @@ use i3ipc;
 use i3ipc::I3EventListener;
 use i3ipc::Subscription;
 use i3ipc::event::inner::WindowChange;
-use log::{Log, ToLog};
+use log::{LogRow, Log};
 use std::error::Error;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
@@ -38,11 +38,11 @@ impl I3LogEvent {
     }
 }
 
-impl ToLog for I3LogEvent {
-    fn to_log(&self, event_id: u32) -> Log {
+impl Log for I3LogEvent {
+    fn to_log(&self, event_id: u32) -> LogRow {
         let now = Local::now();
         let elapsed = now.signed_duration_since(self.start_time);
-        Log {
+        LogRow {
             id: event_id,
             window_id: self.window_id,
             window_class: self.window_class.clone(),
@@ -117,7 +117,7 @@ fn capture_i3_events(sender: Sender<Event>) -> Result<(), Box<Error>> {
     Ok(())
 }
 
-pub fn run(sender: Sender<Box<ToLog + Send>>, sleep_for: Duration) -> Result<(), Box<Error>> {
+pub fn run(sender: Sender<Box<Log>>, sleep_for: Duration) -> Result<(), Box<Error>> {
     let (tx, rx) = channel();
     {
         let tx = tx.clone();
@@ -163,10 +163,7 @@ pub fn run(sender: Sender<Box<ToLog + Send>>, sleep_for: Duration) -> Result<(),
                                 .unwrap_or_else(|| "Untitled".into());
                             let new_event =
                                 I3LogEvent::new(window_id as u32, window_class, window_title);
-                            {
-                                let new_event = new_event.clone();
-                                prev_i3_event = Some(new_event);
-                            }
+                            prev_i3_event = Some(new_event.clone());
                             sender.send(Box::new(new_event))?;
                         }
                         _ => {}
@@ -179,10 +176,7 @@ pub fn run(sender: Sender<Box<ToLog + Send>>, sleep_for: Duration) -> Result<(),
                 }
                 if let Some(prev) = prev_i3_event {
                     let new_event = I3LogEvent::from_prev(&prev);
-                    {
-                        let new_event = new_event.clone();
-                        prev_i3_event = Some(new_event);
-                    }
+                    prev_i3_event = Some(new_event.clone());
                     sender.send(Box::new(new_event))?;
                     i3_event_id_sequence += 1;
                     {

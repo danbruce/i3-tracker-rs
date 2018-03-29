@@ -3,7 +3,7 @@ use std::error::Error;
 use std::fs::File;
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Log {
+pub struct LogRow {
     pub id: u32,
     pub start_time: String,
     pub end_time: String,
@@ -13,7 +13,7 @@ pub struct Log {
     pub window_title: String,
 }
 
-impl Log {
+impl LogRow {
     pub fn write(&self, writer: &mut Writer<File>) -> Result<(), Box<Error>> {
         writer.serialize(self)?;
         writer.flush()?;
@@ -21,6 +21,6 @@ impl Log {
     }
 }
 
-pub trait ToLog {
-    fn to_log(&self, event_id: u32) -> Log;
+pub trait Log: Send {
+    fn to_log(&self, event_id: u32) -> LogRow;
 }
