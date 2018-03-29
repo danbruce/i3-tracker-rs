@@ -1,10 +1,10 @@
 use csv::{Reader, Writer, WriterBuilder};
 use fs2::FileExt;
-use log::{LogRow, Log};
+use log::{Log, LogRow};
 use std::error::Error;
 use std::fs::{File, OpenOptions};
 use std::path::Path;
-use std::sync::mpsc::channel;
+use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 use track_i3;
@@ -34,7 +34,7 @@ fn csv_writer<P: AsRef<Path>>(path: P) -> Result<Writer<File>, Box<Error>> {
 }
 
 pub fn run<P: AsRef<Path>>(out_path: P, tick_sleep: Duration) -> Result<(), Box<Error>> {
-    let (tx, rx) = channel();
+    let (tx, rx) = mpsc::channel();
     // start the i3 event listening thread
     {
         let tx = tx.clone();

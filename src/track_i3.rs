@@ -1,13 +1,10 @@
 use chrono::prelude::*;
-use i3ipc;
-use i3ipc::I3EventListener;
-use i3ipc::Subscription;
-use i3ipc::event::inner::WindowChange;
-use log::{LogRow, Log};
+use i3ipc::{I3EventListener, Subscription, event::Event as RawI3Event, event::Event::WindowEvent,
+            event::inner::WindowChange};
+use log::{Log, LogRow};
 use std::error::Error;
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::{self, Sender};
 use std::thread;
-use std::thread::sleep;
 use std::time::Duration;
 use xcb;
 
@@ -95,12 +92,12 @@ fn get_class(conn: &xcb::Connection, window_id: u32) -> String {
 }
 
 enum Event {
-    I3(i3ipc::event::Event),
+    I3(RawI3Event),
     Tick(u32),
 }
 
 fn timeout(sender: Sender<Event>, event_id: u32, sleep_for: Duration) -> Result<(), Box<Error>> {
-    sleep(sleep_for);
+    thread::sleep(sleep_for);
     sender.send(Event::Tick(event_id))?;
     Ok(())
 }
@@ -118,7 +115,7 @@ fn capture_i3_events(sender: Sender<Event>) -> Result<(), Box<Error>> {
 }
 
 pub fn run(sender: Sender<Box<Log>>, sleep_for: Duration) -> Result<(), Box<Error>> {
-    let (tx, rx) = channel();
+    let (tx, rx) = mpsc::channel();
     {
         let tx = tx.clone();
         thread::spawn(move || {
@@ -133,7 +130,7 @@ pub fn run(sender: Sender<Box<Log>>, sleep_for: Duration) -> Result<(), Box<Erro
         let event = rx.recv()?;
         match event {
             Event::I3(e) => {
-                if let i3ipc::event::Event::WindowEvent(e) = e {
+                if let WindowEvent(e) = e {
                     let window_id = e.container.window.unwrap_or(-1);
                     if window_id < 1 {
                         continue;
