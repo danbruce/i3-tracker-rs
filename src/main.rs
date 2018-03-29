@@ -9,7 +9,7 @@ extern crate xcb;
 
 use std::time::Duration;
 
-mod tick;
+mod log;
 mod time_tracker;
 mod track_i3;
 
