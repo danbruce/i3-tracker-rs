@@ -17,20 +17,19 @@ struct I3LogEvent {
 }
 
 impl I3LogEvent {
-    fn new(window_id: u32, window_class: String, window_title: String) -> Self {
+    fn new<S: Into<String>>(window_id: u32, class: S, title: S) -> Self {
         I3LogEvent {
             start_time: Local::now(),
             window_id,
-            window_class,
-            window_title,
+            window_class: class.into(),
+            window_title: title.into(),
         }
     }
     fn from_prev(old_event: &Self) -> Self {
         I3LogEvent {
             start_time: Local::now(),
             window_id: old_event.window_id,
-            window_class: old_event.window_class.clone(),
-            window_title: old_event.window_title.clone(),
+            ..old_event.clone()
         }
     }
 }
@@ -154,10 +153,8 @@ pub fn run(sender: Sender<Box<Log>>, sleep_for: Duration) -> Result<(), Box<Erro
                     match e.change {
                         WindowChange::Focus | WindowChange::Title => {
                             let window_class = get_class(&xorg_conn, window_id as u32);
-                            let window_title = e.container
-                                .name
-                                .clone()
-                                .unwrap_or_else(|| "Untitled".into());
+                            let window_title =
+                                e.container.name.unwrap_or_else(|| "Untitled".to_owned());
                             let new_event =
                                 I3LogEvent::new(window_id as u32, window_class, window_title);
                             prev_i3_event = Some(new_event.clone());
@@ -176,12 +173,11 @@ pub fn run(sender: Sender<Box<Log>>, sleep_for: Duration) -> Result<(), Box<Erro
                     prev_i3_event = Some(new_event.clone());
                     sender.send(Box::new(new_event))?;
                     i3_event_id_sequence += 1;
-                    {
-                        let tx = tx.clone();
-                        thread::spawn(move || {
-                            timeout(tx, i3_event_id_sequence, sleep_for).unwrap();
-                        });
-                    }
+
+                    let tx = tx.clone();
+                    thread::spawn(move || {
+                        timeout(tx, i3_event_id_sequence, sleep_for).unwrap();
+                    });
                 }
             }
         };
