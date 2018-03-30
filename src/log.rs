@@ -1,6 +1,5 @@
-use csv::Writer;
-use std::error::Error;
-use std::fs::File;
+use csv::{Reader, Writer};
+use std::{error::Error, fs::{File, OpenOptions}, path::Path};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LogRow {
@@ -18,6 +17,15 @@ impl LogRow {
         writer.serialize(self)?;
         writer.flush()?;
         Ok(())
+    }
+    pub fn read<P: AsRef<Path>>(path: P) -> Result<LogRow, Box<Error>> {
+        if let Ok(f) = OpenOptions::new().read(true).open(path) {
+            let mut r = Reader::from_reader(f);
+            if let Some(res) = r.deserialize().last() {
+                return Ok(res?);
+            }
+        }
+        Err(String::from("file not found"))?
     }
 }
 

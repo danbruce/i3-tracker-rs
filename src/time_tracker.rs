@@ -1,23 +1,15 @@
-use csv::{Reader, Writer, WriterBuilder};
+use csv::{Writer, WriterBuilder};
 use fs2::FileExt;
 use log::{Log, LogRow};
-use std::error::Error;
-use std::fs::{File, OpenOptions};
-use std::path::Path;
-use std::sync::mpsc;
 use std::thread;
-use std::time::Duration;
+use std::{error::Error, fs::{File, OpenOptions}, path::Path, sync::mpsc, time::Duration};
 use track_i3;
 
-fn initial_event_id<P: AsRef<Path>>(path: P) -> Result<u32, Box<Error>> {
-    if let Ok(f) = OpenOptions::new().read(true).open(path) {
-        let mut r = Reader::from_reader(f);
-        if let Some(res) = r.deserialize().last() {
-            let log: LogRow = res?;
-            return Ok(log.id + 1);
-        }
+fn initial_event_id<P: AsRef<Path>>(path: P) -> u32 {
+    match LogRow::read(path) {
+        Ok(log) => log.id + 1,
+        Err(_) => 1,
     }
-    Ok(1)
 }
 
 fn csv_writer<P: AsRef<Path>>(path: P) -> Result<Writer<File>, Box<Error>> {
@@ -43,7 +35,7 @@ pub fn run<P: AsRef<Path>>(out_path: P, tick_sleep: Duration) -> Result<(), Box<
         });
     }
 
-    let mut next_event_id = initial_event_id(&out_path)?;
+    let mut next_event_id = initial_event_id(&out_path);
     let mut previous_event: Option<Box<Log>> = None;
     let mut writer = csv_writer(&out_path)?;
     loop {
