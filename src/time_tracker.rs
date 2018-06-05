@@ -83,7 +83,15 @@ pub fn run<P: AsRef<Path>>(out_path: P, tick_sleep: Duration) -> Result<(), Box<
     let track_i3_tx = tx.clone();
     // start the i3 event listening thread
     thread::spawn(move || {
-        track_i3::run(track_i3_tx).unwrap();
+        loop {
+            match track_i3::run(track_i3_tx.clone()) {
+                Err(_) => {
+                    // if something goes wrong with the socket, try to reconnect
+                    continue;
+                },
+                _ => unreachable!()
+            }
+        }
     });
 
     let mut next_event_id = initial_event_id(&out_path)?;
