@@ -71,16 +71,15 @@ pub fn run(sender: Sender<super::time_tracker::LogEvent>) -> Result<(), Box<dyn 
                         Some(properties) => {
                             match properties.get(&i3ipc::reply::WindowProperty::Class) {
                                 Some(win_class) => win_class.clone(),
-                                None => "".into()
+                                None => "Unknown".into(),
                             }
                         }
-                        None => "".into()
+                        None => "Unknown".into(),
                     };
-                    let window_title = e
-                        .container
-                        .name
-                        .clone()
-                        .unwrap_or_else(|| "Untitled".into());
+                    let window_title = match e.container.name {
+                        Some(win_title) => win_title.clone(),
+                        None => "Untitled".into(),
+                    };
                     let send_event = I3Event(I3LogEvent::new(
                         window_id as u32,
                         window_class,
