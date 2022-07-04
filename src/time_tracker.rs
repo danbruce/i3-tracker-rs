@@ -24,9 +24,9 @@ struct Log {
 }
 
 impl Log {
-    fn new(id: u32, event: &LogEvent) -> Log {
+    fn new(id: u32, event: LogEvent) -> Log {
         match event {
-            &LogEvent::I3Event(ref e) => {
+            LogEvent::I3Event(e) => {
                 let now = Local::now();
                 let elapsed = now.signed_duration_since(e.start_time);
                 Log {
@@ -102,10 +102,10 @@ pub fn run<P: AsRef<Path>>(out_path: P, tick_sleep: Duration) -> Result<(), Box<
     let mut prev_i3_event: Option<track_i3::I3LogEvent> = None;
     loop {
         let event = rx.recv()?;
-        match &event {
-            &LogEvent::I3Event(ref e) => {
+        match event {
+            LogEvent::I3Event(e) => {
                 if let Some(prev) = prev_i3_event {
-                    let log = Log::new(next_event_id, &LogEvent::I3Event(prev));
+                    let log = Log::new(next_event_id, LogEvent::I3Event(prev));
                     log.write(&mut writer)?;
                     next_event_id += 1;
                 }
@@ -115,12 +115,12 @@ pub fn run<P: AsRef<Path>>(out_path: P, tick_sleep: Duration) -> Result<(), Box<
                 });
                 prev_i3_event = Some(e.clone());
             }
-            &LogEvent::TickEvent(ref e) => {
+            LogEvent::TickEvent(e) => {
                 if next_event_id != e.0 {
                     continue;
                 }
                 if let Some(prev) = prev_i3_event {
-                    let log = Log::new(next_event_id, &LogEvent::I3Event(prev.clone()));
+                    let log = Log::new(next_event_id, LogEvent::I3Event(prev.clone()));
                     log.write(&mut writer)?;
                     next_event_id += 1;
                     prev_i3_event = Some(track_i3::I3LogEvent::from_tick(&prev));
