@@ -75,7 +75,7 @@ fn get_class(conn: &xcb::Connection, window_id: u32) -> String {
     results[0].to_string()
 }
 
-pub fn run(sender: Sender<super::time_tracker::LogEvent>) -> Result<(), Box<Error>> {
+pub fn run(sender: Sender<super::time_tracker::LogEvent>) -> Result<(), Box<dyn Error>> {
     let mut i3_listener = I3EventListener::connect()?;
     let (xorg_conn, _) = xcb::Connection::connect(None)?;
 

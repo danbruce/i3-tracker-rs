@@ -41,14 +41,14 @@ impl Log {
             _ => { unreachable!() }
         }
     }
-    fn write(&self, writer: &mut Writer<File>) -> Result<(), Box<Error>> {
+    fn write(&self, writer: &mut Writer<File>) -> Result<(), Box<dyn Error>> {
         writer.serialize(self)?;
         writer.flush()?;
         Ok(())
     }
 }
 
-fn initial_event_id<P: AsRef<Path>>(path: P) -> Result<u32, Box<Error>> {
+fn initial_event_id<P: AsRef<Path>>(path: P) -> Result<u32, Box<dyn Error>> {
     if let Ok(f) = OpenOptions::new().read(true).open(path) {
         let mut r = Reader::from_reader(f);
         if let Some(res) = r.deserialize().last() {
@@ -59,7 +59,7 @@ fn initial_event_id<P: AsRef<Path>>(path: P) -> Result<u32, Box<Error>> {
     Ok(1)
 }
 
-fn csv_writer<P: AsRef<Path>>(path: P) -> Result<Writer<File>, Box<Error>> {
+fn csv_writer<P: AsRef<Path>>(path: P) -> Result<Writer<File>, Box<dyn Error>> {
     let has_headers = !Path::new(path.as_ref()).exists();
     let file = OpenOptions::new()
         .create(true)
@@ -78,7 +78,7 @@ pub enum LogEvent {
     TickEvent(tick::TickEvent),
 }
 
-pub fn run<P: AsRef<Path>>(out_path: P, tick_sleep: Duration) -> Result<(), Box<Error>> {
+pub fn run<P: AsRef<Path>>(out_path: P, tick_sleep: Duration) -> Result<(), Box<dyn Error>> {
     let (tx, rx): (Sender<LogEvent>, Receiver<LogEvent>) = mpsc::channel();
     let track_i3_tx = tx.clone();
     // start the i3 event listening thread
