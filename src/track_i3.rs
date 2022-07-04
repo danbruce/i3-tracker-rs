@@ -1,12 +1,11 @@
 use super::time_tracker::LogEvent::I3Event;
 use chrono::prelude::*;
+use i3ipc::event::inner::WindowChange;
+use i3ipc::event::Event;
 use i3ipc::I3EventListener;
 use i3ipc::Subscription;
-use i3ipc::event::Event;
-use i3ipc::event::inner::WindowChange;
 use std::error::Error;
 use std::sync::mpsc::Sender;
-use xcb;
 
 #[derive(Clone)]
 pub struct I3LogEvent {
@@ -35,49 +34,8 @@ impl I3LogEvent {
     }
 }
 
-/*
- * Mostly pulled from:
- * https://stackoverflow.com/questions/44833160/how-do-i-get-the-x-window-class-given-a-window-id-with-rust-xcb
- */
-fn get_class(conn: &xcb::Connection, window_id: u32) -> String {
-    let long_length: u32 = 8;
-    let mut long_offset: u32 = 0;
-    let mut buf = Vec::new();
-    loop {
-        let cookie = xcb::xproto::get_property(
-            conn,
-            false,
-            window_id,
-            xcb::xproto::ATOM_WM_CLASS,
-            xcb::xproto::ATOM_STRING,
-            long_offset,
-            long_length,
-        );
-        match cookie.get_reply() {
-            Ok(reply) => {
-                let value: &[u8] = reply.value();
-                buf.extend_from_slice(value);
-                match reply.bytes_after() {
-                    0 => break,
-                    _ => {
-                        let len = reply.value_len();
-                        long_offset += len / 4;
-                    }
-                }
-            }
-            Err(_) => {
-                break;
-            }
-        }
-    }
-    let result = String::from_utf8(buf).unwrap();
-    let results: Vec<_> = result.split('\0').collect();
-    results[0].to_string()
-}
-
 pub fn run(sender: Sender<super::time_tracker::LogEvent>) -> Result<(), Box<dyn Error>> {
     let mut i3_listener = I3EventListener::connect()?;
-    let (xorg_conn, _) = xcb::Connection::connect(None)?;
 
     let subs = [Subscription::Window];
     i3_listener.subscribe(&subs)?;
@@ -109,8 +67,16 @@ pub fn run(sender: Sender<super::time_tracker::LogEvent>) -> Result<(), Box<dyn 
             prev_new_window_id = None;
             match e.change {
                 WindowChange::Focus | WindowChange::Title => {
-                    let window_class = get_class(&xorg_conn, window_id as u32);
-                    let window_title = e.container
+                    let mut window_class = String::from("");
+                    if let Some(properties) = e.container.window_properties {
+                        if let Some(win_class) =
+                            properties.get(&i3ipc::reply::WindowProperty::Class)
+                        {
+                            window_class = win_class.clone();
+                        }
+                    }
+                    let window_title = e
+                        .container
                         .name
                         .clone()
                         .unwrap_or_else(|| "Untitled".into());

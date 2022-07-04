@@ -10,6 +10,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use std::time::Duration;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Log {
@@ -38,7 +39,9 @@ impl Log {
                     end_time: now.format("%F %T").to_string(),
                 }
             }
-            _ => { unreachable!() }
+            _ => {
+                unreachable!()
+            }
         }
     }
     fn write(&self, writer: &mut Writer<File>) -> Result<(), Box<dyn Error>> {
@@ -88,8 +91,8 @@ pub fn run<P: AsRef<Path>>(out_path: P, tick_sleep: Duration) -> Result<(), Box<
                 Err(_) => {
                     // if something goes wrong with the socket, try to reconnect
                     continue;
-                },
-                _ => unreachable!()
+                }
+                _ => unreachable!(),
             }
         }
     });

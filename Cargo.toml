@@ -7,9 +7,5 @@ authors = ["Daniel Bruce <dbruce1126@gmail.com>"]
 chrono = { version = "0.4", features = ["serde"] }
 csv = "1.0.0-beta.5"
 fs2 = "0.4.2"
-xcb = "0.8"
-serde_derive = "1.0"
-serde = "1.0"
-
-[dependencies.i3ipc]
-version = "0.8.2"
+i3ipc = "0.10.1"
+serde = { version = "1.0.138", features = ["derive"] }
