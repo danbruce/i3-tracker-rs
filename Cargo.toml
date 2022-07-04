@@ -4,8 +4,8 @@ version = "0.1.0"
 authors = ["Daniel Bruce <dbruce1126@gmail.com>"]
 
 [dependencies]
-chrono = { version = "0.4", features = ["serde"] }
-csv = "1.0.0-beta.5"
-fs2 = "0.4.2"
+chrono = { version = "0.4.19", features = ["serde"] }
+csv = "1.1.6"
+fs2 = "0.4.3"
 i3ipc = "0.10.1"
 serde = { version = "1.0.138", features = ["derive"] }
