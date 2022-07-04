@@ -67,7 +67,7 @@ pub fn run(sender: Sender<super::time_tracker::LogEvent>) -> Result<(), Box<dyn 
             prev_new_window_id = None;
             match e.change {
                 WindowChange::Focus | WindowChange::Title => {
-                    let mut window_class = String::from("");
+                    let mut window_class = "".into();
                     if let Some(properties) = e.container.window_properties {
                         if let Some(win_class) =
                             properties.get(&i3ipc::reply::WindowProperty::Class)
