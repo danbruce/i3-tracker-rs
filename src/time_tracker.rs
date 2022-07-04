@@ -3,6 +3,7 @@ use super::track_i3;
 use chrono::prelude::*;
 use csv::{Reader, Writer, WriterBuilder};
 use fs2::FileExt;
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs::{File, OpenOptions};
 use std::path::Path;
@@ -10,7 +11,6 @@ use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Log {
