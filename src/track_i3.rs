@@ -67,14 +67,15 @@ pub fn run(sender: Sender<super::time_tracker::LogEvent>) -> Result<(), Box<dyn 
             prev_new_window_id = None;
             match e.change {
                 WindowChange::Focus | WindowChange::Title => {
-                    let mut window_class = "".into();
-                    if let Some(properties) = e.container.window_properties {
-                        if let Some(win_class) =
-                            properties.get(&i3ipc::reply::WindowProperty::Class)
-                        {
-                            window_class = win_class.clone();
+                    let window_class = match e.container.window_properties {
+                        Some(properties) => {
+                            match properties.get(&i3ipc::reply::WindowProperty::Class) {
+                                Some(win_class) => win_class.clone(),
+                                None => "".into()
+                            }
                         }
-                    }
+                        None => "".into()
+                    };
                     let window_title = e
                         .container
                         .name
