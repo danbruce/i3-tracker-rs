@@ -3,6 +3,7 @@ use super::track_i3;
 use chrono::prelude::*;
 use csv::{Reader, Writer, WriterBuilder};
 use fs2::FileExt;
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fs::{File, OpenOptions};
 use std::path::Path;
@@ -23,9 +24,9 @@ struct Log {
 }
 
 impl Log {
-    fn new(id: u32, event: &LogEvent) -> Log {
+    fn new(id: u32, event: LogEvent) -> Log {
         match event {
-            &LogEvent::I3Event(ref e) => {
+            LogEvent::I3Event(e) => {
                 let now = Local::now();
                 let elapsed = now.signed_duration_since(e.start_time);
                 Log {
@@ -38,17 +39,19 @@ impl Log {
                     end_time: now.format("%F %T").to_string(),
                 }
             }
-            _ => { unreachable!() }
+            _ => {
+                unreachable!()
+            }
         }
     }
-    fn write(&self, writer: &mut Writer<File>) -> Result<(), Box<Error>> {
+    fn write(&self, writer: &mut Writer<File>) -> Result<(), Box<dyn Error>> {
         writer.serialize(self)?;
         writer.flush()?;
         Ok(())
     }
 }
 
-fn initial_event_id<P: AsRef<Path>>(path: P) -> Result<u32, Box<Error>> {
+fn initial_event_id<P: AsRef<Path>>(path: P) -> Result<u32, Box<dyn Error>> {
     if let Ok(f) = OpenOptions::new().read(true).open(path) {
         let mut r = Reader::from_reader(f);
         if let Some(res) = r.deserialize().last() {
@@ -59,7 +62,7 @@ fn initial_event_id<P: AsRef<Path>>(path: P) -> Result<u32, Box<Error>> {
     Ok(1)
 }
 
-fn csv_writer<P: AsRef<Path>>(path: P) -> Result<Writer<File>, Box<Error>> {
+fn csv_writer<P: AsRef<Path>>(path: P) -> Result<Writer<File>, Box<dyn Error>> {
     let has_headers = !Path::new(path.as_ref()).exists();
     let file = OpenOptions::new()
         .create(true)
@@ -78,7 +81,7 @@ pub enum LogEvent {
     TickEvent(tick::TickEvent),
 }
 
-pub fn run<P: AsRef<Path>>(out_path: P, tick_sleep: Duration) -> Result<(), Box<Error>> {
+pub fn run<P: AsRef<Path>>(out_path: P, tick_sleep: Duration) -> Result<(), Box<dyn Error>> {
     let (tx, rx): (Sender<LogEvent>, Receiver<LogEvent>) = mpsc::channel();
     let track_i3_tx = tx.clone();
     // start the i3 event listening thread
@@ -88,8 +91,8 @@ pub fn run<P: AsRef<Path>>(out_path: P, tick_sleep: Duration) -> Result<(), Box<
                 Err(_) => {
                     // if something goes wrong with the socket, try to reconnect
                     continue;
-                },
-                _ => unreachable!()
+                }
+                _ => unreachable!(),
             }
         }
     });
@@ -99,10 +102,10 @@ pub fn run<P: AsRef<Path>>(out_path: P, tick_sleep: Duration) -> Result<(), Box<
     let mut prev_i3_event: Option<track_i3::I3LogEvent> = None;
     loop {
         let event = rx.recv()?;
-        match &event {
-            &LogEvent::I3Event(ref e) => {
+        match event {
+            LogEvent::I3Event(e) => {
                 if let Some(prev) = prev_i3_event {
-                    let log = Log::new(next_event_id, &LogEvent::I3Event(prev));
+                    let log = Log::new(next_event_id, LogEvent::I3Event(prev));
                     log.write(&mut writer)?;
                     next_event_id += 1;
                 }
@@ -112,12 +115,12 @@ pub fn run<P: AsRef<Path>>(out_path: P, tick_sleep: Duration) -> Result<(), Box<
                 });
                 prev_i3_event = Some(e.clone());
             }
-            &LogEvent::TickEvent(ref e) => {
+            LogEvent::TickEvent(e) => {
                 if next_event_id != e.0 {
                     continue;
                 }
                 if let Some(prev) = prev_i3_event {
-                    let log = Log::new(next_event_id, &LogEvent::I3Event(prev.clone()));
+                    let log = Log::new(next_event_id, LogEvent::I3Event(prev.clone()));
                     log.write(&mut writer)?;
                     next_event_id += 1;
                     prev_i3_event = Some(track_i3::I3LogEvent::from_tick(&prev));
